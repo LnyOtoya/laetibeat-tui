@@ -9,6 +9,7 @@ import (
 
 	"github.com/LnyOtoya/laetibeat-tui/internal/config"
 	"github.com/LnyOtoya/laetibeat-tui/internal/ui/components"
+	"github.com/LnyOtoya/laetibeat-tui/internal/ui/messages"
 	"github.com/LnyOtoya/laetibeat-tui/internal/ui/styles"
 )
 
@@ -78,16 +79,22 @@ func (p *ConfigPage) Init() tea.Cmd {
 func (p *ConfigPage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
-	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		switch msg.String() {
-		case "tab", "shift+tab", "enter", "up", "down":
+	// 检查是否是键盘事件
+	if keyMsg, ok := msg.(tea.KeyMsg); ok {
+		// 处理特殊键
+		switch keyMsg.String() {
+		case "esc":
+			// 发送切换页面消息
+			return p, func() tea.Msg {
+				return messages.SwitchPageMsg{Page: "home"}
+			}
+		case "ctrl+s":
+			// 保存配置
+			p.saveConfig()
+			p.Status.ShowSuccess("配置已保存")
+		case "tab", "shift+tab", "up", "down":
 			// 处理焦点移动
-			switch msg.String() {
-			case "enter":
-				// 保存配置
-				p.saveConfig()
-				p.Status.ShowSuccess("配置已保存")
+			switch keyMsg.String() {
 			case "up", "shift+tab":
 				// 向上移动焦点
 				p.FocusIndex--
@@ -143,8 +150,8 @@ func (p *ConfigPage) View() string {
 		"主题: "+p.Config.UI.Theme,
 		"显示专辑封面: "+boolToString(p.Config.UI.Artwork),
 		"",
-		styles.Button.Render("按 Enter 保存配置"),
-		"按 'c' 返回主页面",
+		styles.Button.Render("按 Ctrl+S 保存配置"),
+		"按 'ESC' 返回主页面",
 	)
 
 	// 居中显示
@@ -196,6 +203,13 @@ func (p *ConfigPage) saveConfig() {
 	_, err := fmt.Sscanf(p.VolumeInput.Value(), "%d", &volume)
 	if err == nil {
 		p.Config.Player.Volume = volume
+	}
+
+	// 保存配置到文件
+	err = p.Config.Save()
+	if err != nil {
+		p.Status.ShowError("保存配置失败: " + err.Error())
+		return
 	}
 }
 

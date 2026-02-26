@@ -8,6 +8,7 @@ import (
 	"github.com/LnyOtoya/laetibeat-tui/internal/audio/mpv"
 	"github.com/LnyOtoya/laetibeat-tui/internal/config"
 	"github.com/LnyOtoya/laetibeat-tui/internal/models"
+	"github.com/LnyOtoya/laetibeat-tui/internal/ui/messages"
 	"github.com/LnyOtoya/laetibeat-tui/internal/ui/pages"
 	"github.com/LnyOtoya/laetibeat-tui/internal/ui/styles"
 )
@@ -81,35 +82,56 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	// 处理键盘事件
 	if msg, ok := msg.(tea.KeyMsg); ok {
-		switch msg.String() {
-		case "ctrl+c":
-			// 退出应用
-			return a, tea.Quit
-		case "b":
-			// 切换到浏览页面
-			a.CurrentPage = PageTypeBrowse
-		case "p":
-			// 切换到播放列表页面
-			a.CurrentPage = PageTypePlaylist
-		case "n":
-			// 切换到现在播放页面
-			a.CurrentPage = PageTypeNowPlaying
-		case "c":
-			// 切换到配置页面
-			a.CurrentPage = PageTypeConfig
-		case "space":
-			// 播放/暂停
-			if a.MPVClient != nil {
-				status, err := a.MPVClient.GetStatus()
-				if err == nil {
-					if status.Playing {
-						a.MPVClient.Pause()
-					} else {
-						a.MPVClient.Resume()
+		// 只有在非配置页面时才处理全局快捷键
+		if a.CurrentPage != PageTypeConfig {
+			switch msg.String() {
+			case "ctrl+c":
+				// 退出应用
+				return a, tea.Quit
+			case "b":
+				// 切换到浏览页面
+				a.CurrentPage = PageTypeBrowse
+				return a, nil
+			case "p":
+				// 切换到播放列表页面
+				a.CurrentPage = PageTypePlaylist
+				return a, nil
+			case "n":
+				// 切换到现在播放页面
+				a.CurrentPage = PageTypeNowPlaying
+				return a, nil
+			case "c":
+				// 切换到配置页面
+				a.CurrentPage = PageTypeConfig
+				return a, nil
+			case "space":
+				// 播放/暂停
+				if a.MPVClient != nil {
+					status, err := a.MPVClient.GetStatus()
+					if err == nil {
+						if status.Playing {
+							a.MPVClient.Pause()
+						} else {
+							a.MPVClient.Resume()
+						}
 					}
 				}
 			}
+		} else {
+			// 在配置页面，只处理ctrl+c退出
+			if msg.String() == "ctrl+c" {
+				return a, tea.Quit
+			}
 		}
+	}
+
+	// 处理切换页面消息
+	if switchMsg, ok := msg.(messages.SwitchPageMsg); ok {
+		switch switchMsg.Page {
+		case "home":
+			a.CurrentPage = PageTypeBrowse
+		}
+		return a, nil
 	}
 
 	// 更新当前页面
@@ -219,7 +241,7 @@ func (a *App) buildStatusBar() string {
 	statusText += " | 页面: " + pageText
 
 	// 添加快捷键提示
-	shortcuts := "B:浏览 N:现在播放 P:播放列表 C:配置 空格:播放/暂停"
+	shortcuts := "B:浏览 N:现在播放 P:播放列表 C:配置 ESC:返回 空格:播放/暂停"
 
 	// 布局状态栏
 	statusStyle := styles.StatusBar.Copy().Width(a.Width)

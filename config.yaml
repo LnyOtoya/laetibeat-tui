@@ -1,0 +1,13 @@
+cache:
+    enabled: true
+    ttl: 3600
+player:
+    crossfade: false
+    volume: 80
+server:
+    password: "486952"
+    url: http://192.168.2.6:4533
+    username: otoya
+ui:
+    artwork: true
+    theme: default
