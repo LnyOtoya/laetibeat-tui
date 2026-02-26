@@ -62,7 +62,7 @@ func NewBrowsePage(apiClient api.APIClient, width, height int) *BrowsePage {
 // Init 初始化页面
 func (p *BrowsePage) Init() tea.Cmd {
 	// 加载艺术家列表
-	return p.loadArtists
+	return p.loadArtists()
 }
 
 // Update 更新页面
@@ -81,6 +81,15 @@ func (p *BrowsePage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 
+	// 处理列表选择
+	if keyMsg, ok := msg.(tea.KeyMsg); ok {
+		if keyMsg.Type == tea.KeyEnter {
+			if cmd := p.handleListSelect(); cmd != nil {
+				cmds = append(cmds, cmd)
+			}
+		}
+	}
+
 	// 更新搜索组件
 	searchModel, err := p.Search.Update(msg)
 	if err == nil {
@@ -94,11 +103,13 @@ func (p *BrowsePage) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	// 更新列表组件
 	// 注意：我们不能直接修改List的内部状态，因为list字段是未导出的
-	// 这里需要通过其他方式更新List，或者修改List组件的设计
-
-	// 处理列表选择
-	// 注意：在新版本的bubbles/list中，SelectMsg可能已经不存在
-	// 我们需要通过其他方式处理列表选择，例如通过键盘事件
+	// 我们需要通过NewList方法重新创建List组件
+	_, listCmd := p.List.Update(msg)
+	if listCmd != nil {
+		cmds = append(cmds, listCmd)
+	}
+	// 重新创建List组件以更新状态
+	p.List = components.NewList(p.List.Model().Title, p.List.Model().Items(), p.Width-4, p.Height-10)
 
 	// 处理加载完成消息
 	switch msg := msg.(type) {
@@ -167,13 +178,11 @@ func (p *BrowsePage) SetSize(width, height int) {
 }
 
 // handleListSelect 处理列表选择
-// 注意：在新版本的bubbles/list中，SelectMsg可能已经不存在
-// 这个方法暂时保留，但需要重新实现
-func (p *BrowsePage) handleListSelect() {
+func (p *BrowsePage) handleListSelect() tea.Cmd {
 	// 获取当前选中的项
 	item, ok := p.List.SelectedItem()
 	if !ok {
-		return
+		return nil
 	}
 
 	switch p.ViewMode {
@@ -197,12 +206,26 @@ func (p *BrowsePage) handleListSelect() {
 		}
 	case ViewModeSongs:
 		// 选择歌曲，播放
-		song, ok := item.(songItem)
+		songItem, ok := item.(songItem)
 		if ok {
-			p.Status.ShowInfo("正在播放: " + song.TitleName)
-			// 播放逻辑将在主应用中处理
+			// 创建歌曲模型
+			song := &models.Song{
+				ID:       songItem.ID,
+				Title:    songItem.TitleName,
+				Artist:   songItem.Artist,
+				Album:    songItem.Album,
+				Track:    songItem.Track,
+				Duration: songItem.Duration,
+			}
+			p.Status.ShowInfo("正在播放: " + song.Title)
+			// 发送播放歌曲消息
+			return func() tea.Msg {
+				return PlaySongMsg{Song: song}
+			}
 		}
 	}
+
+	return nil
 }
 
 // 消息类型
@@ -230,6 +253,11 @@ type searchResultMsg struct {
 // errorMsg 错误消息
 type errorMsg struct {
 	error error
+}
+
+// PlaySongMsg 播放歌曲消息
+type PlaySongMsg struct {
+	Song *models.Song
 }
 
 // 列表项类型
@@ -320,12 +348,14 @@ func (i songItem) formatDuration(seconds int) string {
 // 加载数据的命令
 
 // loadArtists 加载艺术家列表
-func (p *BrowsePage) loadArtists() tea.Msg {
-	artists, err := p.API.GetArtists()
-	if err != nil {
-		return errorMsg{error: err}
+func (p *BrowsePage) loadArtists() tea.Cmd {
+	return func() tea.Msg {
+		artists, err := p.API.GetArtists()
+		if err != nil {
+			return errorMsg{error: err}
+		}
+		return artistsLoadedMsg{artists: artists}
 	}
-	return artistsLoadedMsg{artists: artists}
 }
 
 // loadAlbums 加载专辑列表

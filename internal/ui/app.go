@@ -177,6 +177,13 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.NowPlayingPage.SetSong(statusMsg.Song)
 	}
 
+	// 处理播放歌曲消息
+	if playMsg, ok := msg.(pages.PlaySongMsg); ok {
+		if err := a.PlaySong(playMsg.Song); err != nil {
+			a.BrowsePage.Status.ShowError("播放歌曲失败: " + err.Error())
+		}
+	}
+
 	// 组合命令
 	if cmd != nil {
 		cmds = append(cmds, cmd)
