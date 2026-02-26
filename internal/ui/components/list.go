@@ -45,8 +45,9 @@ func (l *List) Model() list.Model {
 }
 
 // Update 更新列表
-func (l *List) Update(msg interface{}) (list.Model, tea.Cmd) {
-	return l.list.Update(msg)
+func (l *List) Update(msg interface{}) (*List, tea.Cmd) {
+	updatedListModel, cmd := l.list.Update(msg)
+	return &List{list: updatedListModel}, cmd
 }
 
 // View 渲染列表
